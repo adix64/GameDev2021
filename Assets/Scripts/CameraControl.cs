@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
+﻿using UnityEngine;
 public class CameraControl : MonoBehaviour
 {
     float yaw = 0;
@@ -9,6 +6,8 @@ public class CameraControl : MonoBehaviour
     public Transform player;
     public float distToTarget = 4f;
     public Vector3 camOffset;
+    public float minPitch = -45f;
+    public float maxPitch = 45f;
     // Start is called before the first frame update
     void Start()
     {
@@ -20,6 +19,7 @@ public class CameraControl : MonoBehaviour
     {
         yaw += Input.GetAxis("Mouse X"); // look stanga-dreapta (rotatie in jurul axei verticale)
         pitch -= Input.GetAxis("Mouse Y");// look sus-jos(rotatie in jurul axei orizontale)
+        pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
         transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
         //deplasamentul camerei de la centru, transformat din spatiu camera in spatiul lume:
         Vector3 co = transform.TransformVector(camOffset);

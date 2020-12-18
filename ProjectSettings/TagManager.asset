@@ -15,10 +15,10 @@ TagManager:
   - 
   - Checkpoints
   - Platforms
-  - 
-  - 
-  - 
-  - 
+  - HitBox
+  - HurtBox
+  - OppHitBox
+  - OppHurtBox
   - 
   - 
   - 

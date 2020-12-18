@@ -1,45 +1,57 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
-public class MovePlayer : MonoBehaviour
+﻿using UnityEngine;
+public class MovePlayer : GenericPlayer
 {
-    public float rotSpeed = 10f;
     public float jumpPower = 10f;
-    public float groundedThreshold = 0.1f;
-    public float combatRange = 4f;
     public float minY = -40f;
     Transform cameraTransform;
-    Animator animator;
-    Rigidbody rigidbody;
-    CapsuleCollider capsule;
     public Vector3 spawnPos;
     private Vector3 moveDir;
     public Transform opponentsCointainer;
     public Transform[] opponents;
+    Transform enemy = null;
+    AnimatorStateInfo stateInfo;
+    Transform headTransform;
     // Start is called before the first frame update
     void Start()
     {
-        animator = GetComponent<Animator>();
-        rigidbody = GetComponent<Rigidbody>();
-        capsule = GetComponent<CapsuleCollider>();
+        base.Init();
+        headTransform = animator.GetBoneTransform(HumanBodyBones.Head);
         cameraTransform = Camera.main.transform;
         spawnPos = transform.position;
-
         opponents = new Transform[opponentsCointainer.childCount];
         for (int i = 0; i < opponentsCointainer.childCount; i++)
             opponents[i] = opponentsCointainer.GetChild(i);
     }
-
     // Update is called once per frame
     void Update()
     {
+        stateInfo = animator.GetCurrentAnimatorStateInfo(0);
         moveDir = GetMoveDirection();
+        GetClosestEnemy();
         UpdateAnimatorParameters();
         HandleJump();
         HandleAttack();
         HandleFallenOff();
     }
+    private void LateUpdate()
+    {
+        HandleHeadTurn();
+    }
+    private void HandleHeadTurn()
+    {
+        if (!enemy || stateInfo.IsTag("attack"))
+            return;
+        Vector3 lookAtPoint = enemy.position + Vector3.up * 1.4f;
+        Vector3 lookDir = (lookAtPoint - headTransform.position).normalized;
+        float fwdDotLookDir = Vector3.Dot(transform.forward, lookDir);
+        if (fwdDotLookDir > 0f)
+        {
+            Quaternion lookRot = Quaternion.LookRotation(lookDir);
+            headTransform.rotation = Quaternion.Slerp(headTransform.rotation, lookRot, fwdDotLookDir);
+
+        }
+    }
+
     private void OnAnimatorMove()
     {
         ApplyRootMotion();
@@ -62,42 +74,15 @@ public class MovePlayer : MonoBehaviour
         if (transform.position.y < minY)
             transform.position = spawnPos;
     }
-
     private void HandleJump()
     {
-        bool grounded = false; //presupunem ca e in aer
-        Ray ray = new Ray();
-        Vector3 centerRayOrigin = transform.position + Vector3.up * groundedThreshold;
-        ray.direction = Vector3.down;
-        int layerMask = ~LayerMask.NameToLayer("Checkpoints");
-        //aruncam 9 raze ca sa ne asiguram ca nu este sub capsula nimic, inclusiv pe conturul ei (cerc din plan topdown)
-        for (float xOffset = -1f; xOffset <= 1f; xOffset += 1f)
-        {
-            for (float zOffset = -1f; zOffset <= 1f; zOffset += 1f)
-            {
-                ray.origin = centerRayOrigin + //originea cu offsetul care te duce pe cerc(conturul topdown al capsulei)
-                            new Vector3(xOffset, 0f, zOffset).normalized * capsule.radius;
-                //aruncam o raza in jos la distanta maxima putin sub capsula ca sa intepe pamantul
-                if (Physics.Raycast(ray, out RaycastHit hitInfo, 2f * groundedThreshold, layerMask))
-                {
-                    grounded = true; // retinem ca e pamant ca sa sara doar in acest caz
-                    Debug.DrawLine(ray.origin, ray.origin + Vector3.down * 2f * groundedThreshold, Color.green,0.2f);
-                    break;
-                }
-                Debug.DrawLine(ray.origin, ray.origin + Vector3.down * 2f * groundedThreshold, Color.red);
-            }
-        }
-
-        animator.SetBool("Midair", !grounded);//inormeaza animatorul ca e in aer daca nu e pe sol
-
+        CheckGroundedStatus();
         if (grounded && Input.GetButtonDown("Jump"))
         {//poti sari doar daca esti pe sol
             Vector3 jumpDirection = (Vector3.up + moveDir).normalized;//sari in sus cu avant in dir. de miscare
             rigidbody.AddForce(jumpDirection * jumpPower, ForceMode.VelocityChange);
         }
-
     }
-
     private void ApplyRootMotion()
     {
         //new Vector3(h, 0, v).normalized; // doar daca e camera aliniata cu axele lumii
@@ -118,20 +103,30 @@ public class MovePlayer : MonoBehaviour
     }
     private void ApplyRootRotation()
     {
-        if (moveDir.magnitude < 10e-3f)//dir miscare < 0.001f, nu se misca
-            return; //deci nu roti
-
-        Vector3 lookDirection = GetLookDirection();
+        Vector3 lookDirection = (moveDir.magnitude > 10e-3f) ? moveDir : transform.forward; // directia de privire coincide implicit cu dir. de miscare
+        if (enemy)
+        {//daca se afla cel mai apropiat oponent la mai putin de 4 metri, orienteaza privirea catre el
+            Vector3 toEnemy = enemy.position - transform.position;
+            lookDirection = Vector3.ProjectOnPlane(toEnemy, Vector3.up).normalized;
+            //daca ajunge sa fuga cu spatele, ajusteaza orientarea a.i. sa nu alunece
+            if (!stateInfo.IsTag("attack"))
+            {
+                float forwardDotMoveDir = Vector3.Dot(moveDir, transform.forward);
+                if (forwardDotMoveDir < -0.5f)//daca merge cu spatele
+                    lookDirection = -moveDir.normalized;//ajusteaza privirea in sens opus directiei de miscare            
+            }
+            animator.SetFloat("distToOpponent", toEnemy.magnitude);
+        }else
+            animator.SetFloat("distToOpponent", combatRange);
         Quaternion lookRotation = Quaternion.LookRotation(lookDirection); //rotatia care orienteaza cu fata de-alungul dir
         //interpolam intre rotatia curenta si rotatia target, ca sa nu se teleporteze rotativ
         transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * rotSpeed);
     }
-
-    private Vector3 GetLookDirection()
+    private void GetClosestEnemy()
     {
-        Vector3 lookDirection = moveDir; // directia de privire coincide implicit cu dir. de miscare
         float minDist = float.MaxValue;
         int closestEnemyIndex = -1;
+        enemy = null;
         for (int i = 0; i < opponents.Length; i++)
         {
             float dist = Vector3.Distance(transform.position, opponents[i].position);
@@ -141,18 +136,8 @@ public class MovePlayer : MonoBehaviour
                 closestEnemyIndex = i;
             }
         }
-        if (closestEnemyIndex != -1)
-        {//daca se afla cel mai apropiat oponent la mai putin de 4 metri, orienteaza privirea catre el
-            Vector3 toEnemy = opponents[closestEnemyIndex].position - transform.position;
-            lookDirection = Vector3.ProjectOnPlane(toEnemy, Vector3.up).normalized;
-            //daca ajunge sa fuga cu spatele, ajusteaza orientarea a.i. sa nu alunece
-            float forwardDotMoveDir = Vector3.Dot(moveDir, transform.forward);
-            if (forwardDotMoveDir < -0.5f)//daca merge cu spatele
-                lookDirection = -moveDir.normalized;//ajusteaza privirea in sens opus directiei de miscare
-        }
-        return lookDirection;
+        enemy = (closestEnemyIndex != -1) ? opponents[closestEnemyIndex] : null;
     }
-
     private Vector3 GetMoveDirection()
     {
         float h = Input.GetAxis("Horizontal"); // -1 pentru tasta A, 1 pentru tasta D, 0 altfel

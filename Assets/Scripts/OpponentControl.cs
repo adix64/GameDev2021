@@ -2,28 +2,39 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
-
-public class OpponentControl : MonoBehaviour
+public class OpponentControl : GenericPlayer
 {
-    Animator animator;
     NavMeshAgent agent;
     public Transform player;
     public float attackDistance = 1.5f;
-    public float rotSpeed = 20f;
+    public float groundedSpeed = .66f;
+    public float midairSpeed = 5f;
+    [Range(0f, 0.5f)]
+    public float offensiveness = 5f;
     // Start is called before the first frame update
     void Start()
     {
-        animator = GetComponent<Animator>();
+        base.Init();
         agent = GetComponent<NavMeshAgent>();
     }
 
     // Update is called once per frame
     void Update()
     {
+        if (!isAlive)
+        {
+            agent.enabled = false;
+            return;
+        }
         agent.SetDestination(player.position);
         UpdateAnimatorParameters();
         ApplyRootRotation();
         HandleAttack();
+        CheckGroundedStatus();
+        if (grounded)
+            agent.speed = groundedSpeed;
+        else
+            agent.speed = midairSpeed;
     }
     private void ApplyRootRotation()
     {
@@ -35,7 +46,8 @@ public class OpponentControl : MonoBehaviour
     }
     private void HandleAttack()
     {//ataca daca e suficient de aproape
-        if (Vector3.Distance(player.position, transform.position) < attackDistance)
+        if (Vector3.Distance(player.position, transform.position) < attackDistance &&
+            Random.Range(0f, 1f) < offensiveness)
             animator.SetTrigger("Attack");
     }
     private void UpdateAnimatorParameters()
@@ -43,5 +55,6 @@ public class OpponentControl : MonoBehaviour
         Vector3 characterSpaceDir = transform.InverseTransformVector(agent.velocity.normalized);
         animator.SetFloat("Forward", characterSpaceDir.z, 0.05f, Time.deltaTime);
         animator.SetFloat("Right", characterSpaceDir.x, 0.05f, Time.deltaTime);
+        animator.SetFloat("distToOpponent", (player.position - transform.position).magnitude);
     }
 }
