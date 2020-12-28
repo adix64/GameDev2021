@@ -6,25 +6,52 @@ public class CameraControl : MonoBehaviour
     public Transform player;
     public float distToTarget = 4f;
     public Vector3 camOffset;
-    public float minPitch = -45f;
-    public float maxPitch = 45f;
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    public Vector3 aimingCamOffset;
+    public Vector3 smoothCamOffset;
+    public float minDefaultPitch = -45f;
+    public float maxDefaultPitch = 45f;
+    public float minAimPitch = -45f;
+    public float maxAimPitch = 45f;
+    public Animator playerAnimator;
+    bool playerAiming;
 
-    // Update is called once per frame
     void LateUpdate()
     {
         yaw += Input.GetAxis("Mouse X"); // look stanga-dreapta (rotatie in jurul axei verticale)
         pitch -= Input.GetAxis("Mouse Y");// look sus-jos(rotatie in jurul axei orizontale)
-        pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
+
+        playerAiming = playerAnimator.GetBool("Aiming");
+        ClampPitch();
+
         transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
-        //deplasamentul camerei de la centru, transformat din spatiu camera in spatiul lume:
-        Vector3 co = transform.TransformVector(camOffset);
+
+        Vector3 co = GetCameraOffset();
         //pozitia camerei in spatiul lume:
-                //de la pozitia jucatorului, ne dam in spate distToTarget unitati si offsetam cu co
+        //de la pozitia jucatorului, ne dam in spate distToTarget unitati si offsetam cu co
         transform.position = player.position - transform.forward * distToTarget + co;
+    }
+
+    private void ClampPitch()
+    {//limiteaza gradul de libertate de privire in functie daca tinteste sau nu:
+        float minPitch = minDefaultPitch;
+        float maxPitch = maxDefaultPitch;
+        if (playerAiming)
+        {
+            minPitch = minAimPitch;
+            maxPitch = maxAimPitch;
+        }
+        pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
+    }
+
+    private Vector3 GetCameraOffset()
+    {
+        Vector3 targetCameraOffset = camOffset; // default camera offset(departe de personaj)
+        if (playerAiming)
+            targetCameraOffset = aimingCamOffset; //camera over the shoulder
+        //smooth interpolation intre cele doua:
+        smoothCamOffset = Vector3.Lerp(smoothCamOffset, targetCameraOffset, Time.deltaTime * 10f);
+        //deplasamentul camerei de la centru, transformat din spatiu camera in spatiul lume:
+        Vector3 co = transform.TransformVector(smoothCamOffset);
+        return co;
     }
 }

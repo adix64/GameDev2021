@@ -16,7 +16,10 @@ public class GroundedStateBehaviour : StateMachineBehaviour
         float guardWeight = animator.GetFloat("distToOpponent");
         guardWeight = Mathf.Clamp(guardWeight, 2f, 4f);
         guardWeight  = 1f - (guardWeight - 2f) / 2f; //conversie interval [2,4]->[1,0]
-        animator.SetLayerWeight(1, guardWeight);
+
+        float layerWeight = Mathf.Max(guardWeight,
+                    animator.GetBool("Aiming") ? 1f : guardWeight);
+        animator.SetLayerWeight(1, layerWeight);
     }
 
     // OnStateExit is called when a transition ends and the state machine finishes evaluating this state

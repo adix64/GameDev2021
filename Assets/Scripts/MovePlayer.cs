@@ -32,6 +32,12 @@ public class MovePlayer : GenericPlayer
         HandleJump();
         HandleAttack();
         HandleFallenOff();
+        HandleAiming();
+    }
+    private void HandleAiming()
+    {
+        bool aiming = Input.GetButton("Fire2");
+        animator.SetBool("Aiming", aiming);
     }
     private void LateUpdate()
     {
@@ -118,12 +124,17 @@ public class MovePlayer : GenericPlayer
             animator.SetFloat("distToOpponent", toEnemy.magnitude);
         }else
             animator.SetFloat("distToOpponent", combatRange);
+
+        if(animator.GetBool("Aiming"))
+            lookDirection = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
         Quaternion lookRotation = Quaternion.LookRotation(lookDirection); //rotatia care orienteaza cu fata de-alungul dir
         //interpolam intre rotatia curenta si rotatia target, ca sa nu se teleporteze rotativ
         transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * rotSpeed);
     }
     private void GetClosestEnemy()
     {
+        if (stateInfo.IsTag("attack"))
+            return;
         float minDist = float.MaxValue;
         int closestEnemyIndex = -1;
         enemy = null;
