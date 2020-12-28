@@ -20,6 +20,6 @@ public class RestartGameOnDeath : MonoBehaviour
             deadTime += Time.deltaTime;
 
         if (deadTime > 3f)
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            SceneManager.LoadScene("Menu");
     }
 }

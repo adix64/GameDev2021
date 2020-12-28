@@ -11,13 +11,38 @@ public class OpponentControl : GenericPlayer
     public float midairSpeed = 5f;
     [Range(0f, 0.5f)]
     public float offensiveness = 5f;
+    Vector3 destinationOffset;
     // Start is called before the first frame update
     void Start()
     {
         base.Init();
         agent = GetComponent<NavMeshAgent>();
+        StartCoroutine(SeedDestination(1f));
     }
+    IEnumerator SeedDestination(float t)
+    {
+        yield return new WaitForSeconds(t);
+        /// schimbare destinatie:
+        int r = UnityEngine.Random.Range(0, 10);
+        switch (r)
+        {
+            case 0: case 1: case 2:
+                destinationOffset = Vector3.zero;
+                break;
+            case 3: case 4: case 5:
+                destinationOffset = -transform.forward * 4f; //4 metri mai in spate
+                break;
+            case 6: case 7:
+                destinationOffset = transform.right * 4f; //4 metri la dreapta
+                break;
+            case 8: case 9: 
+                destinationOffset = -transform.right * 4f; //4 metri la stanga
+                break;
+        }
 
+        t = UnityEngine.Random.Range(0.5f, 1.5f);
+        StartCoroutine(SeedDestination(t));
+    }
     // Update is called once per frame
     void Update()
     {
@@ -26,7 +51,7 @@ public class OpponentControl : GenericPlayer
             agent.enabled = false;
             return;
         }
-        agent.SetDestination(player.position);
+        agent.SetDestination(player.position + destinationOffset);
         UpdateAnimatorParameters();
         ApplyRootRotation();
         HandleAttack();
@@ -53,8 +78,8 @@ public class OpponentControl : GenericPlayer
     private void UpdateAnimatorParameters()
     {
         Vector3 characterSpaceDir = transform.InverseTransformVector(agent.velocity.normalized);
-        animator.SetFloat("Forward", characterSpaceDir.z, 0.05f, Time.deltaTime);
-        animator.SetFloat("Right", characterSpaceDir.x, 0.05f, Time.deltaTime);
+        animator.SetFloat("Forward", characterSpaceDir.z, 0.15f, Time.deltaTime);
+        animator.SetFloat("Right", characterSpaceDir.x, 0.15f, Time.deltaTime);
         animator.SetFloat("distToOpponent", (player.position - transform.position).magnitude);
     }
 }

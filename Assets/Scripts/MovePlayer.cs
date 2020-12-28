@@ -65,7 +65,7 @@ public class MovePlayer : GenericPlayer
     }
     private void HandleAttack()
     {
-        if (Input.GetButtonDown("Fire1"))
+        if (Input.GetButtonDown("Fire1") && !animator.GetBool("Aiming"))
             animator.SetTrigger("Attack");
     }
     private void UpdateAnimatorParameters()
